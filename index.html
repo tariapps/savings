@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Savings Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #121212;
+      color: #f3f4f6;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overscroll-behavior-y: contain;
+      touch-action: manipulation;
+    }
+
+    /* Prevent double-tap zoom and text selection on interactive grid cells */
+    .grid-item-cell {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+    }
+
+    /* Custom subtle dark scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #121212;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2c2c2c;
+      border-radius: 9999px;
+    }
+
+    /* Modal transition */
+    .modal-backdrop {
+      background-color: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(3px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#121212] text-gray-100">
+
+  <!-- =====================================================================
+       COMPACT TOP BAR (No App Title to save vertical screen space)
+       ===================================================================== -->
+  <header class="sticky top-0 z-30 bg-[#121212]/95 backdrop-blur border-b border-[#2c2c2c] px-2.5 py-2 flex items-center gap-2.5">
+    <!-- Three-line Hamburger Menu Button -->
+    <button
+      id="menu-toggle-btn"
+      type="button"
+      aria-label="Open Navigation Menu"
+      class="w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-[#1e1e1e] border border-[#2c2c2c] active:scale-95 transition shrink-0"
+    >
+      <span class="block w-5 h-0.5 bg-gray-200 rounded-full"></span>
+      <span class="block w-5 h-0.5 bg-gray-200 rounded-full"></span>
+      <span class="block w-5 h-0.5 bg-gray-200 rounded-full"></span>
+    </button>
+
+    <!-- Dynamic Compact Header Context (Goal info on Current page, or View label) -->
+    <div id="top-bar-context" class="flex-1 min-w-0 flex items-center justify-between gap-2">
+      <!-- Populated dynamically by JS -->
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       POPUP / SLIDE-OUT NAVIGATION MENU
+       ===================================================================== -->
+  <div id="nav-drawer-overlay" class="fixed inset-0 z-40 hidden modal-backdrop">
+    <nav
+      id="nav-drawer"
+      class="w-64 max-w-[80vw] h-full bg-[#1a1a1a] border-r border-[#2c2c2c] p-3 flex flex-col justify-between shadow-2xl"
+    >
+      <div class="space-y-1.5">
+        <div class="flex justify-end pb-1">
+          <button
+            id="menu-close-btn"
+            type="button"
+            aria-label="Close Menu"
+            class="w-9 h-9 rounded-xl bg-[#242424] border border-[#333] text-gray-300 flex items-center justify-center text-lg active:scale-95"
+          >
+            ✕
+          </button>
+        </div>
+
+        <button
+          data-nav="current"
+          class="nav-btn w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center gap-3 transition bg-[#242424] hover:bg-[#2c2c2c] border border-transparent"
+        >
+          <span class="text-emerald-400 text-base">◉</span>
+          <span>Current</span>
+        </button>
+
+        <button
+          data-nav="new"
+          class="nav-btn w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center gap-3 transition bg-[#242424] hover:bg-[#2c2c2c] border border-transparent"
+        >
+          <span class="text-amber-400 text-base">＋</span>
+          <span>New Saving</span>
+        </button>
+
+        <button
+          data-nav="all"
+          class="nav-btn w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center gap-3 transition bg-[#242424] hover:bg-[#2c2c2c] border border-transparent"
+        >
+          <span class="text-sky-400 text-base">☰</span>
+          <span>All Savings</span>
+        </button>
+
+        <button
+          data-nav="settings"
+          class="nav-btn w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center gap-3 transition bg-[#242424] hover:bg-[#2c2c2c] border border-transparent"
+        >
+          <span class="text-gray-400 text-base">⚙</span>
+          <span>Settings</span>
+        </button>
+      </div>
+
+      <div class="text-[11px] text-gray-500 px-2 py-1">
+        Single tap: Info • Double tap: Check
+      </div>
+    </nav>
+  </div>
+
+  <!-- =====================================================================
+       MAIN CONTENT CONTAINER
+       ===================================================================== -->
+  <main id="app-main" class="flex-1 w-full max-w-3xl mx-auto p-2.5 sm:p-4">
+    <!-- Active view rendered here -->
+  </main>
+
+  <!-- =====================================================================
+       REUSABLE MODAL CONTAINER (Info, Confirm Check, Remove Check, Delete)
+       ===================================================================== -->
+  <div id="modal-root" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
+    <div id="modal-box" class="w-full max-w-sm bg-[#1e1e1e] border border-[#333333] rounded-2xl p-4 shadow-2xl space-y-4">
+      <!-- Modal content injected dynamically -->
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TOAST NOTIFICATION BANNER
+       ===================================================================== -->
+  <div
+    id="toast-banner"
+    class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-[#252525] border border-emerald-500/40 text-sm text-gray-100 shadow-lg opacity-0 pointer-events-none transition-opacity duration-200"
+  ></div>
+
+  <script>
+    /**
+     * ============================================================================
+     * USER CONFIGURATION SECTION (Easily customize check icon & money sum icons)
+     * ============================================================================
+     */
+
+    // 1. Checkmark icon configuration (displayed centered over checked items)
+    const CHECK_ICON_CONFIG = {
+      type: 'unicode',          // Options: 'unicode' or 'image'
+      unicode: '✓',             // Used when type === 'unicode' (e.g., '✓', '✔', '✅')
+      imageUrl: '',             // Used when type === 'image' (e.g., 'images/check.png' or data URI)
+      size: '30px',             // Easily adjust checkmark size here (e.g., '24px', '32px', '65%')
+      color: '#10b981'          // Emerald green color for unicode check
+    };
+
+    // 2. Built-in crisp SVG fallbacks (encoded cleanly so no external assets break)
+    const DEFAULT_SVGS = {
+      envelope: "data:image/svg+xml;utf8," + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" fill="none" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="6" width="56" height="36" rx="5" fill="#23272e"/>
+          <path d="M5 8l27 21L59 8"/>
+          <path d="M5 40l19-15M59 40L40 25"/>
+        </svg>`
+      ),
+      piggy: "data:image/svg+xml;utf8," + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 52" fill="none" stroke="#9ca3af" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M48 22c0-8.8-8-15-18-15-8.5 0-15.6 4.6-17.4 11H9c-1.7 0-3 1.3-3 3v5c0 1.7 1.3 3 3 3h3.2c1.2 3.2 3.4 5.9 6.3 7.7V44c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-3h7v3c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-6.7c3.6-2.5 6-6.5 6.4-11.1L52 24c1.5-.5 2.5-1.8 2.5-3.3 0-1.9-1.8-3.3-3.7-2.8L48 19" fill="#23272e"/>
+          <path d="M25 11h10" stroke="#fbbf24" stroke-width="2.5"/>
+          <circle cx="15" cy="21" r="1.5" fill="#9ca3af"/>
+        </svg>`
+      ),
+      heart: "data:image/svg+xml;utf8," + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 58" fill="none" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M32 51S7 35.4 7 18.5C7 11.1 12.8 5 20 5c4.5 0 8.6 2.2 12 5.8C35.4 7.2 39.5 5 44 5c7.2 0 13 6.1 13 13.5C57 35.4 32 51 32 51z" fill="#23272e"/>
+        </svg>`
+      )
+    };
+
+    /**
+     * Predefined Icon Types Array/Map:
+     * - Replace `image` with your own image path or URL whenever desired.
+     * - `textPosition`: 'above' | 'middle' | 'below'
+     * - `offsetX`: horizontal offset in % relative to center of the icon (e.g., 0, -5, 10)
+     * - `offsetY`: vertical offset in % relative to center of the icon (e.g., 0, -10, 8)
+     */
+    const ICON_TYPES = {
+      envelope: {
+        key: 'envelope',
+        label: 'Envelope',
+        image: DEFAULT_SVGS.envelope, // <-- Replace with custom image URL if desired
+        textPosition: 'above',        // Envelope places money sum above the icon
+        offsetX: 0,                   // % offset relative to center
+        offsetY: 0                    // % offset relative to center
+      },
+      piggy: {
+        key: 'piggy',
+        label: 'Piggy',
+        image: DEFAULT_SVGS.piggy,    // <-- Replace with custom image URL if desired
+        textPosition: 'middle',       // Piggy places money sum in the middle of the icon
+        offsetX: 0,                   // % offset relative to center
+        offsetY: 4                    // Slight downward % nudge to sit nicely inside piggy belly
+      },
+      heart: {
+        key: 'heart',
+        label: 'Heart',
+        image: DEFAULT_SVGS.heart,    // <-- Replace with custom image URL if desired
+        textPosition: 'below',        // Heart places money sum below the icon
+        offsetX: 0,                   // % offset relative to center
+        offsetY: 0                    // % offset relative to center
+      }
+    };
+
+    /**
+     * ============================================================================
+     * DATE FORMATTING HELPER: Exact d.m.y - h:i:s format
+     * ============================================================================
+     */
+    function formatDateDMY_HIS(dateInput = new Date()) {
+      const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const seconds = String(d.getSeconds()).padStart(2, '0');
+      return `${day}.${month}.${year} - ${hours}:${minutes}:${seconds}`;
+    }
+
+    /**
+     * ============================================================================
+     * DUAL PERSISTENT STORAGE ENGINE (IndexedDB Primary + localStorage Fallback)
+     * ============================================================================
+     */
+    const StorageEngine = (() => {
+      const DB_NAME = 'SavingsTrackerDB';
+      const DB_VERSION = 1;
+      const STORE_NAME = 'appState';
+      const STATE_KEY = 'mainState';
+      const LS_BACKUP_KEY = 'savings_tracker_backup_v1';
+
+      let dbInstance = null;
+
+      function openDB() {
+        return new Promise((resolve) => {
+          if (!('indexedDB' in window)) {
+            resolve(null);
+            return;
+          }
+          try {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = (e) => {
+              const db = e.target.result;
+              if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+              }
+            };
+            req.onsuccess = (e) => {
+              dbInstance = e.target.result;
+              resolve(dbInstance);
+            };
+            req.onerror = () => resolve(null);
+          } catch (err) {
+            resolve(null);
+          }
+        });
+      }
+
+      async function loadState() {
+        const db = await openDB();
+        let idbData = null;
+
+        if (db) {
+          idbData = await new Promise((resolve) => {
+            try {
+              const tx = db.transaction(STORE_NAME, 'readonly');
+              const store = tx.objectStore(STORE_NAME);
+              const req = store.get(STATE_KEY);
+              req.onsuccess = () => resolve(req.result || null);
+              req.onerror = () => resolve(null);
+            } catch (e) {
+              resolve(null);
+            }
+          });
+        }
+
+        let lsData = null;
+        try {
+          const raw = localStorage.getItem(LS_BACKUP_KEY);
+          if (raw) lsData = JSON.parse(raw);
+        } catch (e) {
+          lsData = null;
+        }
+
+        // Choose whichever store has valid/newer data
+        if (idbData && lsData) {
+          const idbTime = idbData.updatedAt || 0;
+          const lsTime = lsData.updatedAt || 0;
+          return idbTime >= lsTime ? idbData : lsData;
+        }
+        return idbData || lsData || {
+          savings: [],
+          activeGoalId: null,
+          settings: {},
+          updatedAt: Date.now()
+        };
+      }
+
+      async function saveState(state) {
+        state.updatedAt = Date.now();
+
+        // 1. Always mirror to localStorage immediately
+        try {
+          localStorage.setItem(LS_BACKUP_KEY, JSON.stringify(state));
+        } catch (e) {
+          console.warn('localStorage write warning:', e);
+        }
+
+        // 2. Persist to IndexedDB
+        const db = dbInstance || (await openDB());
+        if (db) {
+          await new Promise((resolve) => {
+            try {
+              const tx = db.transaction(STORE_NAME, 'readwrite');
+              const store = tx.objectStore(STORE_NAME);
+              const req = store.put(state, STATE_KEY);
+              req.onsuccess = () => resolve(true);
+              req.onerror = () => resolve(false);
+            } catch (e) {
+              resolve(false);
+            }
+          });
+        }
+      }
+
+      return { loadState, saveState };
+    })();
+
+    /**
+     * ============================================================================
+     * APPLICATION STATE & HELPERS
+     * ============================================================================
+     */
+    let appState = {
+      savings: [],
+      activeGoalId: null,
+      settings: {},
+      updatedAt: 0
+    };
+
+    let currentView = 'current'; // 'current' | 'new' | 'all' | 'edit' | 'settings'
+    let editingGoalId = null;
+
+    function generateId() {
+      return 'goal_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast-banner');
+      el.textContent = msg;
+      el.classList.remove('opacity-0');
+      el.classList.add('opacity-100');
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => {
+        el.classList.remove('opacity-100');
+        el.classList.add('opacity-0');
+      }, 2200);
+    }
+
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * Resolves which goal should be displayed on the "Current" page:
+     * - Prioritizes `activeGoalId` if it exists and has not ended.
+     * - Otherwise falls back to the most recently opened/created non-ended goal.
+     */
+    function getActiveGoal() {
+      const activeGoals = appState.savings.filter((g) => !g.ended);
+      if (activeGoals.length === 0) return null;
+
+      if (appState.activeGoalId) {
+        const match = activeGoals.find((g) => g.id === appState.activeGoalId);
+        if (match) return match;
+      }
+
+      // Sort by lastOpenedAt or createdAt descending
+      activeGoals.sort((a, b) => (b.lastOpenedAt || b.createdAtTs || 0) - (a.lastOpenedAt || a.createdAtTs || 0));
+      appState.activeGoalId = activeGoals[0].id;
+      return activeGoals[0];
+    }
+
+    /**
+     * Generates array of money sum items based on user's population rule or custom integer
+     */
+    function generateMoneyItems(count, method, customSumRaw) {
+      const safeCount = Math.max(1, Math.min(1000, parseInt(count, 10) || 100));
+      const items = [];
+
+      // If custom sum input is filled, override listbox and convert to integer
+      const hasCustomSum = customSumRaw !== '' && customSumRaw !== null && customSumRaw !== undefined && !isNaN(parseInt(customSumRaw, 10));
+      const customInt = hasCustomSum ? parseInt(customSumRaw, 10) : null;
+
+      if (hasCustomSum) {
+        for (let i = 0; i < safeCount; i++) {
+          items.push({
+            index: i,
+            amount: customInt,
+            checked: false,
+            checkedAt: null,
+            note: ''
+          });
+        }
+        return items;
+      }
+
+      if (method === '1_to_100') {
+        for (let i = 0; i < safeCount; i++) {
+          items.push({
+            index: i,
+            amount: i + 1,
+            checked: false,
+            checkedAt: null,
+            note: ''
+          });
+        }
+      } else if (method === 'only_10') {
+        for (let i = 0; i < safeCount; i++) {
+          items.push({
+            index: i,
+            amount: 10,
+            checked: false,
+            checkedAt: null,
+            note: ''
+          });
+        }
+      } else if (method === 'only_20') {
+        for (let i = 0; i < safeCount; i++) {
+          items.push({
+            index: i,
+            amount: 20,
+            checked: false,
+            checkedAt: null,
+            note: ''
+          });
+        }
+      } else if (method === 'mix_10_50_20pct') {
+        // 10, 20, 30, 40, 50 each 20%
+        const denominations = [10, 20, 30, 40, 50];
+        const pool = [];
+        for (let i = 0; i < safeCount; i++) {
+          pool.push(denominations[i % denominations.length]);
+        }
+        // Shuffle pool cleanly (Fisher-Yates) so distribution is balanced & fun
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        for (let i = 0; i < safeCount; i++) {
+          items.push({
+            index: i,
+            amount: pool[i],
+            checked: false,
+            checkedAt: null,
+            note: ''
+          });
+        }
+      }
+
+      return items;
+    }
+
+    /**
+     * ============================================================================
+     * MODAL SYSTEM
+     * ============================================================================
+     */
+    function openModal(htmlContent) {
+      const root = document.getElementById('modal-root');
+      const box = document.getElementById('modal-box');
+      box.innerHTML = htmlContent;
+      root.classList.remove('hidden');
+      root.classList.add('flex');
+    }
+
+    function closeModal() {
+      const root = document.getElementById('modal-root');
+      root.classList.add('hidden');
+      root.classList.remove('flex');
+    }
+
+    // Close modal when tapping backdrop
+    document.getElementById('modal-root').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-root') {
+        closeModal();
+      }
+    });
+
+    /**
+     * Single-tap info modal
+     */
+    function showItemInfoModal(goal, itemIndex) {
+      const item = goal.items[itemIndex];
+      if (!item) return;
+
+      const statusBadge = item.checked
+        ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Checked</span>`
+        : `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-700/50 text-gray-300 border border-gray-600">Unchecked</span>`;
+
+      openModal(`
+        <div class="flex items-center justify-between border-b border-[#2c2c2c] pb-2.5">
+          <div class="text-lg font-bold text-white">${item.amount}€</div>
+          ${statusBadge}
+        </div>
+        <div class="space-y-2.5 text-sm">
+          <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wider">Checked Date</div>
+            <div class="text-gray-100 font-medium mt-0.5">${item.checked && item.checkedAt ? escapeHTML(item.checkedAt) : 'Not checked yet'}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wider">Note</div>
+            <div class="text-gray-200 bg-[#141414] border border-[#2a2a2a] rounded-xl p-2.5 mt-1 min-h-[42px] break-words">
+              ${item.note ? escapeHTML(item.note) : '<span class="text-gray-500 italic">No note saved</span>'}
+            </div>
+          </div>
+        </div>
+        <div class="pt-1 flex justify-end">
+          <button
+            id="modal-close-info"
+            type="button"
+            class="w-full py-2.5 rounded-xl bg-[#2a2a2a] hover:bg-[#333] text-gray-100 font-medium text-sm active:scale-98 transition"
+          >
+            Close
+          </button>
+        </div>
+      `);
+
+      document.getElementById('modal-close-info').addEventListener('click', closeModal);
+    }
+
+    /**
+     * Double-tap check or uncheck confirmation modal
+     */
+    function showItemToggleModal(goal, itemIndex) {
+      const item = goal.items[itemIndex];
+      if (!item) return;
+
+      if (!item.checked) {
+        // Confirm checking an unchecked item + optional note input
+        openModal(`
+          <div class="space-y-1">
+            <h3 class="text-base font-bold text-white">Check ${item.amount}€?</h3>
+            <p class="text-xs text-gray-400">Mark this amount as saved and optionally add a note.</p>
+          </div>
+          <div>
+            <label for="check-note-input" class="block text-xs text-gray-400 mb-1">Optional Note</label>
+            <input
+              id="check-note-input"
+              type="text"
+              placeholder="e.g., Cash deposit, birthday gift..."
+              class="w-full px-3 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <button
+              id="modal-cancel-btn"
+              type="button"
+              class="py-2.5 rounded-xl bg-[#2a2a2a] text-gray-300 font-medium text-sm active:scale-95 transition"
+            >
+              Cancel
+            </button>
+            <button
+              id="modal-confirm-check-btn"
+              type="button"
+              class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm active:scale-95 transition"
+            >
+              Confirm
+            </button>
+          </div>
+        `);
+
+        const noteInput = document.getElementById('check-note-input');
+        setTimeout(() => noteInput && noteInput.focus(), 50);
+
+        document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+        document.getElementById('modal-confirm-check-btn').addEventListener('click', async () => {
+          item.checked = true;
+          item.checkedAt = formatDateDMY_HIS(new Date());
+          item.note = noteInput.value.trim();
+          goal.lastOpenedAt = Date.now();
+          appState.activeGoalId = goal.id;
+          await StorageEngine.saveState(appState);
+          closeModal();
+          renderCurrentView();
+          showToast(`Saved ${item.amount}€`);
+        });
+      } else {
+        // Confirm removing check from an already checked item
+        openModal(`
+          <div class="space-y-1.5">
+            <h3 class="text-base font-bold text-white">Remove check for ${item.amount}€?</h3>
+            <p class="text-xs text-gray-400">This will also delete the saved date and note for this item.</p>
+            ${item.checkedAt ? `<div class="text-xs text-gray-400 pt-1">Checked: <span class="text-gray-200">${escapeHTML(item.checkedAt)}</span></div>` : ''}
+            ${item.note ? `<div class="text-xs text-gray-400">Note: <span class="text-gray-200">${escapeHTML(item.note)}</span></div>` : ''}
+          </div>
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <button
+              id="modal-cancel-uncheck-btn"
+              type="button"
+              class="py-2.5 rounded-xl bg-[#2a2a2a] text-gray-300 font-medium text-sm active:scale-95 transition"
+            >
+              Keep
+            </button>
+            <button
+              id="modal-confirm-uncheck-btn"
+              type="button"
+              class="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm active:scale-95 transition"
+            >
+              Remove Check
+            </button>
+          </div>
+        `);
+
+        document.getElementById('modal-cancel-uncheck-btn').addEventListener('click', closeModal);
+        document.getElementById('modal-confirm-uncheck-btn').addEventListener('click', async () => {
+          item.checked = false;
+          item.checkedAt = null;
+          item.note = '';
+          goal.lastOpenedAt = Date.now();
+          await StorageEngine.saveState(appState);
+          closeModal();
+          renderCurrentView();
+          showToast(`Removed ${item.amount}€`);
+        });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * NAVIGATION MENU HANDLING
+     * ============================================================================
+     */
+    const navOverlay = document.getElementById('nav-drawer-overlay');
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const menuCloseBtn = document.getElementById('menu-close-btn');
+
+    function openNavMenu() {
+      navOverlay.classList.remove('hidden');
+      updateNavHighlight();
+    }
+
+    function closeNavMenu() {
+      navOverlay.classList.add('hidden');
+    }
+
+    function updateNavHighlight() {
+      document.querySelectorAll('.nav-btn').forEach((btn) => {
+        const target = btn.getAttribute('data-nav');
+        if (target === currentView) {
+          btn.classList.add('border-emerald-500/50', 'bg-[#2a2a2a]', 'text-white');
+        } else {
+          btn.classList.remove('border-emerald-500/50', 'bg-[#2a2a2a]', 'text-white');
+        }
+      });
+    }
+
+    menuToggleBtn.addEventListener('click', openNavMenu);
+    menuCloseBtn.addEventListener('click', closeNavMenu);
+    navOverlay.addEventListener('click', (e) => {
+      if (e.target === navOverlay) closeNavMenu();
+    });
+
+    document.querySelectorAll('.nav-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-nav');
+        closeNavMenu();
+        navigateTo(view);
+      });
+    });
+
+    function navigateTo(view, goalId = null) {
+      currentView = view;
+      if (view === 'edit' && goalId) {
+        editingGoalId = goalId;
+      }
+      renderCurrentView();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    /**
+     * ============================================================================
+     * VIEW RENDERERS
+     * ============================================================================
+     */
+    function renderCurrentView() {
+      const main = document.getElementById('app-main');
+      const topContext = document.getElementById('top-bar-context');
+
+      if (currentView === 'current') {
+        renderCurrentGoalPage(main, topContext);
+      } else if (currentView === 'new') {
+        renderNewSavingPage(main, topContext);
+      } else if (currentView === 'all') {
+        renderAllSavingsPage(main, topContext);
+      } else if (currentView === 'edit') {
+        renderEditSavingPage(main, topContext);
+      } else if (currentView === 'settings') {
+        renderSettingsPage(main, topContext);
+      }
+    }
+
+    /**
+     * 1. "CURRENT" PAGE
+     */
+    function renderCurrentGoalPage(main, topContext) {
+      const goal = getActiveGoal();
+
+      if (!goal) {
+        topContext.innerHTML = `<span class="text-sm font-medium text-gray-400">No Active Goal</span>`;
+        main.innerHTML = `
+          <div class="bg-[#1e1e1e] border border-[#2c2c2c] rounded-2xl p-6 text-center space-y-4 mt-4">
+            <p class="text-sm text-gray-300">No active saving goals found.</p>
+            <button
+              id="empty-create-btn"
+              type="button"
+              class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm active:scale-95 transition"
+            >
+              + Create New Saving
+            </button>
+          </div>
+        `;
+        document.getElementById('empty-create-btn').addEventListener('click', () => navigateTo('new'));
+        return;
+      }
+
+      // Calculate totals
+      const totalAmount = goal.items.reduce((sum, it) => sum + it.amount, 0);
+      const savedAmount = goal.items.reduce((sum, it) => sum + (it.checked ? it.amount : 0), 0);
+      const checkedCount = goal.items.filter((it) => it.checked).length;
+      const totalCount = goal.items.length;
+      const pct = totalAmount > 0 ? Math.min(100, Math.round((savedAmount / totalAmount) * 100)) : 0;
+
+      // Compact Top Header Info (Next to hamburger button)
+      topContext.innerHTML = `
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline justify-between gap-2">
+            <div class="text-sm font-bold text-white truncate">${escapeHTML(goal.goal)}</div>
+            <div class="text-xs font-semibold text-emerald-400 shrink-0">${savedAmount}€ / ${totalAmount}€</div>
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <div class="flex-1 h-1.5 bg-[#262626] rounded-full overflow-hidden">
+              <div class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+            </div>
+            <span class="text-[11px] text-gray-400 shrink-0">${checkedCount}/${totalCount} (${pct}%)</span>
+          </div>
+        </div>
+      `;
+
+      const iconConfig = ICON_TYPES[goal.iconType] || ICON_TYPES.envelope;
+      const cols = Math.max(3, Math.min(12, parseInt(goal.iconsPerRow, 10) || 6));
+
+      // Adjust font size dynamically so dense grids (e.g., 10-12 columns) stay crisp on phones
+      let labelSizeClass = 'text-xs sm:text-sm';
+      if (cols >= 10) labelSizeClass = 'text-[9px] sm:text-xs';
+      else if (cols >= 8) labelSizeClass = 'text-[10px] sm:text-xs';
+      else if (cols >= 6) labelSizeClass = 'text-[11px] sm:text-xs';
+
+      // Build Checkmark HTML based on CHECK_ICON_CONFIG
+      const checkOverlayHTML =
+        CHECK_ICON_CONFIG.type === 'image' && CHECK_ICON_CONFIG.imageUrl
+          ? `<img
+               src="${escapeHTML(CHECK_ICON_CONFIG.imageUrl)}"
+               alt="Checked"
+               style="width: ${CHECK_ICON_CONFIG.size}; height: ${CHECK_ICON_CONFIG.size}; object-fit: contain;"
+               class="pointer-events-none select-none drop-shadow"
+             />`
+          : `<span
+               style="font-size: ${CHECK_ICON_CONFIG.size}; color: ${CHECK_ICON_CONFIG.color}; line-height: 1;"
+               class="font-bold pointer-events-none select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]"
+             >${escapeHTML(CHECK_ICON_CONFIG.unicode)}</span>`;
+
+      // Generate grid items HTML
+      const cellsHTML = goal.items
+        .map((item, idx) => {
+          const amountText = `${item.amount}€`;
+          const offsetStyle = `transform: translate(${iconConfig.offsetX || 0}%, ${iconConfig.offsetY || 0}%);`;
+
+          const amountBadge = `
+            <span
+              style="${offsetStyle}"
+              class="${labelSizeClass} font-bold tracking-tight leading-none ${
+                item.checked ? 'text-emerald-300' : 'text-gray-100'
+              } drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none"
+            >${amountText}</span>
+          `;
+
+          const iconGraphic = `
+            <div class="relative w-full aspect-[4/3] flex items-center justify-center">
+              <img
+                src="${iconConfig.image}"
+                alt="${escapeHTML(iconConfig.label)}"
+                class="w-full h-full object-contain transition-opacity duration-150 ${
+                  item.checked ? 'opacity-45' : 'opacity-95'
+                } pointer-events-none"
+              />
+              ${
+                iconConfig.textPosition === 'middle'
+                  ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none">${amountBadge}</div>`
+                  : ''
+              }
+              ${
+                item.checked
+                  ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none">${checkOverlayHTML}</div>`
+                  : ''
+              }
+            </div>
+          `;
+
+          return `
+            <div
+              data-item-idx="${idx}"
+              class="grid-item-cell rounded-xl bg-[#1a1a1a] border ${
+                item.checked ? 'border-emerald-500/40 bg-emerald-950/15' : 'border-[#282828]'
+              } p-1 flex flex-col items-center justify-center active:scale-95 transition"
+            >
+              ${iconConfig.textPosition === 'above' ? `<div class="mb-0.5 flex justify-center w-full">${amountBadge}</div>` : ''}
+              ${iconGraphic}
+              ${iconConfig.textPosition === 'below' ? `<div class="mt-0.5 flex justify-center w-full">${amountBadge}</div>` : ''}
+            </div>
+          `;
+        })
+        .join('');
+
+      main.innerHTML = `
+        <div
+          id="savings-grid"
+          style="grid-template-columns: repeat(${cols}, minmax(0, 1fr));"
+          class="grid gap-1.5 sm:gap-2 w-full"
+        >
+          ${cellsHTML}
+        </div>
+      `;
+
+      // Attach reliable Single Tap vs Double Tap detection (works cleanly on iOS/Android & Desktop)
+      const gridEl = document.getElementById('savings-grid');
+      let lastTapTime = 0;
+      let lastTapIdx = null;
+      let singleTapTimer = null;
+      const DOUBLE_TAP_DELAY = 290; // ms
+
+      gridEl.addEventListener('click', (e) => {
+        const cell = e.target.closest('.grid-item-cell');
+        if (!cell) return;
+        const idx = parseInt(cell.getAttribute('data-item-idx'), 10);
+        const now = Date.now();
+
+        if (lastTapIdx === idx && now - lastTapTime < DOUBLE_TAP_DELAY) {
+          // Double Tap detected
+          clearTimeout(singleTapTimer);
+          lastTapTime = 0;
+          lastTapIdx = null;
+          showItemToggleModal(goal, idx);
+        } else {
+          // Potential Single Tap -> wait briefly to see if a second tap arrives
+          lastTapTime = now;
+          lastTapIdx = idx;
+          clearTimeout(singleTapTimer);
+          singleTapTimer = setTimeout(() => {
+            lastTapTime = 0;
+            lastTapIdx = null;
+            showItemInfoModal(goal, idx);
+          }, DOUBLE_TAP_DELAY);
+        }
+      });
+    }
+
+    /**
+     * 2. "NEW SAVING" PAGE
+     */
+    function renderNewSavingPage(main, topContext) {
+      topContext.innerHTML = `<span class="text-sm font-semibold text-gray-200">New Saving</span>`;
+
+      const rowOptions = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        .map((n) => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${n}</option>`)
+        .join('');
+
+      const iconOptions = Object.values(ICON_TYPES)
+        .map((ic) => `<option value="${ic.key}" ${ic.key === 'envelope' ? 'selected' : ''}>${escapeHTML(ic.label)}</option>`)
+        .join('');
+
+      main.innerHTML = `
+        <form id="new-saving-form" class="bg-[#1e1e1e] border border-[#2c2c2c] rounded-2xl p-4 space-y-4">
+          <div>
+            <label for="new-goal-name" class="block text-xs font-medium text-gray-300 mb-1">Goal</label>
+            <input
+              id="new-goal-name"
+              type="text"
+              required
+              placeholder="e.g., Emergency Fund, Vacation..."
+              class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label for="new-item-count" class="block text-xs font-medium text-gray-300 mb-1">How many money sums are added</label>
+            <input
+              id="new-item-count"
+              type="number"
+              min="1"
+              max="1000"
+              value="100"
+              required
+              class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <label for="new-populate-method" class="block text-xs font-medium text-gray-300">How the money sums are populated</label>
+            <select
+              id="new-populate-method"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="1_to_100">from 1 to 100</option>
+              <option value="only_10">only 10's</option>
+              <option value="only_20">only 20's</option>
+              <option value="mix_10_50_20pct">10,20,30,40,50 each 20%</option>
+            </select>
+
+            <div>
+              <input
+                id="new-custom-sum"
+                type="number"
+                step="1"
+                placeholder="Or type custom sum for each item (overrides list)"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="new-icons-per-row" class="block text-xs font-medium text-gray-300 mb-1">Icons per row</label>
+              <select
+                id="new-icons-per-row"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+              >
+                ${rowOptions}
+              </select>
+            </div>
+
+            <div>
+              <label for="new-icon-type" class="block text-xs font-medium text-gray-300 mb-1">Icon image</label>
+              <select
+                id="new-icon-type"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+              >
+                ${iconOptions}
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg active:scale-98 transition"
+          >
+            Create Saving
+          </button>
+        </form>
+      `;
+
+      document.getElementById('new-saving-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const goalName = document.getElementById('new-goal-name').value.trim();
+        if (!goalName) return;
+
+        const count = parseInt(document.getElementById('new-item-count').value, 10) || 100;
+        const method = document.getElementById('new-populate-method').value;
+        const customSumVal = document.getElementById('new-custom-sum').value.trim();
+        const iconsPerRow = parseInt(document.getElementById('new-icons-per-row').value, 10) || 6;
+        const iconType = document.getElementById('new-icon-type').value || 'envelope';
+
+        const now = new Date();
+        const newGoal = {
+          id: generateId(),
+          goal: goalName,
+          createdAt: formatDateDMY_HIS(now),
+          createdAtTs: now.getTime(),
+          lastOpenedAt: now.getTime(),
+          iconsPerRow,
+          iconType,
+          populateMethod: customSumVal !== '' ? `custom_${parseInt(customSumVal, 10)}` : method,
+          customSum: customSumVal !== '' ? parseInt(customSumVal, 10) : null,
+          items: generateMoneyItems(count, method, customSumVal),
+          ended: false,
+          endNote: '',
+          endedAt: null
+        };
+
+        appState.savings.push(newGoal);
+        appState.activeGoalId = newGoal.id;
+        await StorageEngine.saveState(appState);
+
+        showToast('Saving created');
+        navigateTo('current');
+      });
+    }
+
+    /**
+     * 3. "ALL SAVINGS" PAGE
+     */
+    function renderAllSavingsPage(main, topContext) {
+      topContext.innerHTML = `<span class="text-sm font-semibold text-gray-200">All Savings (${appState.savings.length})</span>`;
+
+      if (appState.savings.length === 0) {
+        main.innerHTML = `
+          <div class="bg-[#1e1e1e] border border-[#2c2c2c] rounded-2xl p-6 text-center space-y-3">
+            <p class="text-sm text-gray-400">You haven't created any savings yet.</p>
+            <button
+              id="all-new-btn"
+              type="button"
+              class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold"
+            >
+              + New Saving
+            </button>
+          </div>
+        `;
+        document.getElementById('all-new-btn').addEventListener('click', () => navigateTo('new'));
+        return;
+      }
+
+      // Sort newest first
+      const sorted = [...appState.savings].sort((a, b) => (b.createdAtTs || 0) - (a.createdAtTs || 0));
+
+      const cardsHTML = sorted
+        .map((g) => {
+          const total = g.items.reduce((s, it) => s + it.amount, 0);
+          const saved = g.items.reduce((s, it) => s + (it.checked ? it.amount : 0), 0);
+          const isCurrent = !g.ended && appState.activeGoalId === g.id;
+
+          return `
+            <div
+              data-goal-id="${g.id}"
+              class="saving-list-card bg-[#1e1e1e] hover:bg-[#242424] border ${
+                g.ended ? 'border-[#2c2c2c] opacity-75' : isCurrent ? 'border-emerald-500/40' : 'border-[#2c2c2c]'
+              } rounded-2xl p-3.5 cursor-pointer active:scale-99 transition flex items-center justify-between gap-3"
+            >
+              <div class="min-w-0 flex-1 space-y-1">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-bold text-white truncate">${escapeHTML(g.goal)}</h3>
+                  ${
+                    g.ended
+                      ? `<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">Ended</span>`
+                      : isCurrent
+                      ? `<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">Active</span>`
+                      : ''
+                  }
+                </div>
+                <div class="text-xs text-gray-400">Created: ${escapeHTML(g.createdAt || '-')}</div>
+                <div class="text-xs font-medium text-emerald-400">${saved}€ / ${total}€</div>
+              </div>
+              <div class="text-gray-400 text-sm shrink-0">›</div>
+            </div>
+          `;
+        })
+        .join('');
+
+      main.innerHTML = `<div class="space-y-2.5">${cardsHTML}</div>`;
+
+      document.querySelectorAll('.saving-list-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          const id = card.getAttribute('data-goal-id');
+          navigateTo('edit', id);
+        });
+      });
+    }
+
+    /**
+     * 4. "EDIT SAVING" PAGE
+     */
+    function renderEditSavingPage(main, topContext) {
+      const goal = appState.savings.find((g) => g.id === editingGoalId);
+      if (!goal) {
+        navigateTo('all');
+        return;
+      }
+
+      topContext.innerHTML = `
+        <div class="flex-1 flex items-center justify-between gap-2">
+          <span class="text-sm font-semibold text-gray-200 truncate">Edit Saving</span>
+          <button
+            id="delete-saving-btn"
+            type="button"
+            class="px-3 py-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-semibold active:scale-95 transition shrink-0"
+          >
+            Delete
+          </button>
+        </div>
+      `;
+
+      const rowOptions = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        .map((n) => `<option value="${n}" ${n === goal.iconsPerRow ? 'selected' : ''}>${n}</option>`)
+        .join('');
+
+      const iconOptions = Object.values(ICON_TYPES)
+        .map((ic) => `<option value="${ic.key}" ${ic.key === goal.iconType ? 'selected' : ''}>${escapeHTML(ic.label)}</option>`)
+        .join('');
+
+      main.innerHTML = `
+        <div class="space-y-4">
+          <form id="edit-saving-form" class="bg-[#1e1e1e] border border-[#2c2c2c] rounded-2xl p-4 space-y-4">
+            <div>
+              <label for="edit-goal-name" class="block text-xs font-medium text-gray-300 mb-1">Goal</label>
+              <input
+                id="edit-goal-name"
+                type="text"
+                required
+                value="${escapeHTML(goal.goal)}"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <!-- Read-only structural fields (same layout as New Saving, locked to protect progress) -->
+            <div class="grid grid-cols-2 gap-3 opacity-60">
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Money sums count</label>
+                <input
+                  type="text"
+                  disabled
+                  value="${goal.items.length}"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#2a2a2a] text-sm text-gray-400 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Population rule</label>
+                <input
+                  type="text"
+                  disabled
+                  value="${escapeHTML(goal.customSum !== null && goal.customSum !== undefined ? `${goal.customSum}€ each` : goal.populateMethod)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#2a2a2a] text-sm text-gray-400 cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="edit-icons-per-row" class="block text-xs font-medium text-gray-300 mb-1">Icons per row</label>
+                <select
+                  id="edit-icons-per-row"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+                >
+                  ${rowOptions}
+                </select>
+              </div>
+
+              <div>
+                <label for="edit-icon-type" class="block text-xs font-medium text-gray-300 mb-1">Icon image</label>
+                <select
+                  id="edit-icon-type"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white focus:outline-none focus:border-emerald-500"
+                >
+                  ${iconOptions}
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+              ${
+                !goal.ended
+                  ? `<button
+                       id="open-in-current-btn"
+                       type="button"
+                       class="py-3 rounded-xl bg-[#2a2a2a] hover:bg-[#333] text-emerald-400 font-semibold text-sm active:scale-98 transition"
+                     >
+                       Open Goal
+                     </button>`
+                  : `<button
+                       id="back-to-all-btn"
+                       type="button"
+                       class="py-3 rounded-xl bg-[#2a2a2a] hover:bg-[#333] text-gray-300 font-semibold text-sm active:scale-98 transition"
+                     >
+                       Back
+                     </button>`
+              }
+              <button
+                type="submit"
+                class="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm active:scale-98 transition"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
+
+          <!-- Bottom Section: End Goal -->
+          <div class="bg-[#1e1e1e] border border-[#2c2c2c] rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Goal Status</span>
+              ${
+                goal.ended
+                  ? `<span class="text-xs text-amber-400 font-semibold">Ended on ${escapeHTML(goal.endedAt || '')}</span>`
+                  : `<span class="text-xs text-emerald-400 font-semibold">Active</span>`
+              }
+            </div>
+
+            <div>
+              <label for="end-goal-notes" class="block text-xs font-medium text-gray-300 mb-1">End Notes</label>
+              <input
+                id="end-goal-notes"
+                type="text"
+                value="${escapeHTML(goal.endNote || '')}"
+                placeholder="Optional final notes when ending this goal..."
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#333] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <button
+              id="end-goal-btn"
+              type="button"
+              ${goal.ended ? 'disabled' : ''}
+              class="w-full py-3 rounded-xl ${
+                goal.ended
+                  ? 'bg-[#262626] text-gray-500 cursor-not-allowed'
+                  : 'bg-amber-600 hover:bg-amber-500 text-white active:scale-98'
+              } font-semibold text-sm transition"
+            >
+              ${goal.ended ? 'Goal Already Ended' : 'End Goal'}
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Delete button with confirmation modal
+      document.getElementById('delete-saving-btn').addEventListener('click', () => {
+        openModal(`
+          <div class="space-y-1.5">
+            <h3 class="text-base font-bold text-white">Delete "${escapeHTML(goal.goal)}"?</h3>
+            <p class="text-xs text-gray-400">All data, checked items, and notes for this saving will be permanently deleted.</p>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <button
+              id="cancel-del-btn"
+              type="button"
+              class="py-2.5 rounded-xl bg-[#2a2a2a] text-gray-300 font-medium text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              id="confirm-del-btn"
+              type="button"
+              class="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm"
+            >
+              Delete
+            </button>
+          </div>
+        `);
+
+        document.getElementById('cancel-del-btn').addEventListener('click', closeModal);
+        document.getElementById('confirm-del-btn').addEventListener('click', async () => {
+          appState.savings = appState.savings.filter((g) => g.id !== goal.id);
+          if (appState.activeGoalId === goal.id) {
+            appState.activeGoalId = null;
+          }
+          await StorageEngine.saveState(appState);
+          closeModal();
+          showToast('Saving deleted');
+          navigateTo('all');
+        });
+      });
+
+      // Open goal directly in Current view (marks as most recently opened active goal)
+      const openBtn = document.getElementById('open-in-current-btn');
+      if (openBtn) {
+        openBtn.addEventListener('click', async () => {
+          goal.lastOpenedAt = Date.now();
+          appState.activeGoalId = goal.id;
+          await StorageEngine.saveState(appState);
+          navigateTo('current');
+        });
+      }
+
+      const backBtn = document.getElementById('back-to-all-btn');
+      if (backBtn) {
+        backBtn.addEventListener('click', () => navigateTo('all'));
+      }
+
+      // Save edits
+      document.getElementById('edit-saving-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const updatedGoal = document.getElementById('edit-goal-name').value.trim();
+        if (!updatedGoal) return;
+
+        goal.goal = updatedGoal;
+        goal.iconsPerRow = parseInt(document.getElementById('edit-icons-per-row').value, 10) || 6;
+        goal.iconType = document.getElementById('edit-icon-type').value || 'envelope';
+        goal.endNote = document.getElementById('end-goal-notes').value.trim();
+
+        if (!goal.ended) {
+          goal.lastOpenedAt = Date.now();
+          appState.activeGoalId = goal.id;
+        }
+
+        await StorageEngine.saveState(appState);
+        showToast('Changes saved');
+        navigateTo(goal.ended ? 'all' : 'current');
+      });
+
+      // End Goal button
+      document.getElementById('end-goal-btn').addEventListener('click', async () => {
+        if (goal.ended) return;
+        const notes = document.getElementById('end-goal-notes').value.trim();
+        goal.ended = true;
+        goal.endNote = notes;
+        goal.endedAt = formatDateDMY_HIS(new Date());
+
+        if (appState.activeGoalId === goal.id) {
+          appState.activeGoalId = null;
+        }
+
+        await StorageEngine.saveState(appState);
+        showToast('Goal marked as ended');
+        navigateTo('all');
+      });
+    }
+
+    /**
+     * 5. "SETTINGS" PAGE (Empty placeholder as requested)
+     */
+    function renderSettingsPage(main, topContext) {
+      topContext.innerHTML = `<span class="text-sm font-semibold text-gray-200">Settings</span>`;
+      main.innerHTML = `
+        <div class="bg-[#1e1e1e] border border-[#2c2c2c] rounded-2xl p-6 text-center text-sm text-gray-500">
+          No settings configured yet.
+        </div>
+      `;
+    }
+
+    /**
+     * ============================================================================
+     * INITIALIZATION ON PAGE LOAD
+     * ============================================================================
+     */
+    async function initApp() {
+      appState = await StorageEngine.loadState();
+
+      // First page load ever (no savings exist yet) -> open "new saving" page
+      if (!appState.savings || appState.savings.length === 0) {
+        currentView = 'new';
+      } else {
+        // Subsequent page loads -> open "current" page if an active goal exists, else "new"
+        const activeGoal = getActiveGoal();
+        currentView = activeGoal ? 'current' : 'new';
+      }
+
+      renderCurrentView();
+    }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
